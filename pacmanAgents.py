@@ -1,52 +1,114 @@
-# pacmanAgents.py
-# ---------------
-# Licensing Information:  You are free to use or extend these projects for
-# educational purposes provided that (1) you do not distribute or publish
-# solutions, (2) you retain this notice, and (3) you provide clear
-# attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
-# Attribution Information: The Pacman AI projects were developed at UC Berkeley.
-# The core projects and autograders were primarily created by John DeNero
-# (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
-# Student side autograding was added by Brad Miller, Nick Hay, and
-# Pieter Abbeel (pabbeel@cs.berkeley.edu).
+from game import *
+from learningAgents import ReinforcementAgent
+import random, util, math
 
+class QLearningAgent(ReinforcementAgent):
+    """
+      Q-Learning Agent
+    """
 
-from pacman import Directions
-from game import Agent
-import random
-import game
-import util
+    def __init__(self, **args):
+        "You can initialize Q-values here..."
+        ReinforcementAgent.__init__(self, **args)
 
-class LeftTurnAgent(game.Agent):
-    "An agent that turns left at every opportunity"
+        # Initialize Q-values
+        self.qValues = util.Counter()
+
+    def getQValue(self, state, action):
+        """
+          Returns Q(state,action)
+          Should return 0.0 if we have never seen a state
+          or the Q node value otherwise
+        """
+        return self.qValues[(state, action)]
+
+    def computeValueFromQValues(self, state):
+        """
+          Returns max_action Q(state,action) where the max is over legal actions.
+          Note that if there are no legal actions, which is the case at the
+          terminal state, you should return a value of 0.0.
+        """
+        actions = self.getLegalActions(state)
+        if not actions:
+            return 0.0
+        return max([self.getQValue(state, action) for action in actions])
+
+    def computeActionFromQValues(self, state):
+        """
+          Compute the best action to take in a state. Note that if there are
+          no legal actions, which is the case at the terminal state, you should
+          return None.
+        """
+        actions = self.getLegalActions(state)
+        if not actions:
+            return None
+
+        max_value = self.computeValueFromQValues(state)
+        best_actions = [action for action in actions if self.getQValue(state, action) == max_value]
+        return random.choice(best_actions)
 
     def getAction(self, state):
-        legal = state.getLegalPacmanActions()
-        current = state.getPacmanState().configuration.direction
-        if current == Directions.STOP: current = Directions.NORTH
-        left = Directions.LEFT[current]
-        if left in legal: return left
-        if current in legal: return current
-        if Directions.RIGHT[current] in legal: return Directions.RIGHT[current]
-        if Directions.LEFT[left] in legal: return Directions.LEFT[left]
-        return Directions.STOP
+        """
+          Compute the action to take in the current state. With probability self.epsilon,
+          we should take a random action and take the best policy action otherwise.
+          Note that if there are no legal actions, which is the case at the terminal state,
+          you should return None.
+        """
+        legalActions = self.getLegalActions(state)
+        action = None
+        if legalActions:
+            if util.flipCoin(self.epsilon):
+                action = random.choice(legalActions)
+            else:
+                action = self.computeActionFromQValues(state)
+        return action
 
-class GreedyAgent(Agent):
-    def __init__(self, evalFn="scoreEvaluation"):
-        self.evaluationFunction = util.lookup(evalFn, globals())
-        assert self.evaluationFunction != None
+    def update(self, state, action, nextState, reward):
+        """
+          The parent class calls this to observe a state = action => nextState and reward transition.
+          You should do your Q-Value update here.
+
+          Good Terminal state = 0.0
+          Bad Terminal state = -1.0
+        """
+        sample = reward + self.discount * self.computeValueFromQValues(nextState)
+        self.qValues[(state, action)] = (1 - self.alpha) * self.getQValue(state, action) + self.alpha * sample
+
+    def getPolicy(self, state):
+        return self.computeActionFromQValues(state)
+
+    def getValue(self, state):
+        return self.computeValueFromQValues(state)
+
+class PacmanQAgent(QLearningAgent):
+    """
+    Exactly the same as QLearningAgent, but with different default parameters
+    """
+
+    def __init__(self, epsilon=0.05, gamma=0.8, alpha=0.2, numTraining=0, **args):
+        """
+        These default parameters can be changed from the command line.
+        For example, to change the epsilon parameter, use the following:
+        python pacman.py -p PacmanQAgent -a epsilon=0.1
+
+        alpha    - learning rate
+        epsilon  - exploration rate
+        gamma    - discount factor
+        numTraining - number of training episodes
+        """
+        args['epsilon'] = epsilon
+        args['gamma'] = gamma
+        args['alpha'] = alpha
+        args['numTraining'] = numTraining
+        QLearningAgent.__init__(self, **args)
 
     def getAction(self, state):
-        # Generate candidate actions
-        legal = state.getLegalPacmanActions()
-        if Directions.STOP in legal: legal.remove(Directions.STOP)
+        """
+        Simply calls the getAction method of QLearningAgent and then
+        informs parent of action for Pacman.  Do not change or remove this
+        method.
+        """
+        action = QLearningAgent.getAction(self, state)
+        self.doAction(state, action)
+        return action
 
-        successors = [(state.generateSuccessor(0, action), action) for action in legal]
-        scored = [(self.evaluationFunction(state), action) for state, action in successors]
-        bestScore = max(scored)[0]
-        bestActions = [pair[1] for pair in scored if pair[0] == bestScore]
-        return random.choice(bestActions)
-
-def scoreEvaluation(state):
-    return state.getScore()

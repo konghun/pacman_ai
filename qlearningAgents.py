@@ -80,3 +80,35 @@ class QLearningAgent(ReinforcementAgent):
     def getValue(self, state):
         return self.computeValueFromQValues(state)
 
+class PacmanQAgent(QLearningAgent):
+    """
+    Exactly the same as QLearningAgent, but with different default parameters
+    """
+
+    def __init__(self, epsilon=0.05, gamma=0.8, alpha=0.2, numTraining=0, **args):
+        """
+        These default parameters can be changed from the command line.
+        For example, to change the epsilon parameter, use the following:
+        python pacman.py -p PacmanQAgent -a epsilon=0.1
+
+        alpha    - learning rate
+        epsilon  - exploration rate
+        gamma    - discount factor
+        numTraining - number of training episodes
+        """
+        args['epsilon'] = epsilon
+        args['gamma'] = gamma
+        args['alpha'] = alpha
+        args['numTraining'] = numTraining
+        QLearningAgent.__init__(self, **args)
+
+    def getAction(self, state):
+        """
+        Simply calls the getAction method of QLearningAgent and then
+        informs parent of action for Pacman.  Do not change or remove this
+        method.
+        """
+        action = QLearningAgent.getAction(self, state)
+        self.doAction(state, action)
+        return action
+
